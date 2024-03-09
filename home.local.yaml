@@ -1,0 +1,278 @@
+version: "3.9"
+
+services:
+  traefik:
+    image: "traefik:latest"
+    container_name: "traefik"
+    command:
+      #- "--log.level=DEBUG"
+      - "--api.insecure=true"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+    ports:
+      - "80:80"
+      - "8080:8080"
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.traefik.entrypoints=web"
+      - "traefik.http.routers.traefik.rule=Host(`traefik.home.local`)"
+    # networks:
+    #   - no-internet
+
+  nginx:
+    image: nginx:latest
+    container_name: nginx
+    restart: always
+    ports:
+      - "81:80"
+    environment:
+      - TZ=Europe/Moscow
+    volumes:
+      - $DIR_WWW:/www
+      - $DIR_CONF/nginx/nginx.conf:/etc/nginx/nginx.conf
+      - $DIR_CONF/nginx/conf.d:/etc/nginx/conf.d
+      #      - $DIR_CONF/nginx/sites-available:/etc/nginx/sites-available
+      #      - $DIR_CONF/nginx/sites-enabled:/etc/nginx/sites-enabled
+      - $DIR_LOGS/nginx/log:/var/log/nginx
+    #      - /etc/localtime:/etc/localtime:ro
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.nginx.rule=Host(`home.local`, `site.home.local`, `start.home.local`)"
+      - "traefik.http.routers.nginx.entrypoints=web"
+      - "traefik.http.services.nginx.loadbalancer.server.port=80"
+      - "com.centurylinklabs.watchtower.enable=true"
+    # networks:
+    #   - no-internet
+
+  ytdl_material:
+    image: tzahi12345/youtubedl-material:latest
+    container_name: ytdl_material
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+    environment:
+      - ALLOW_CONFIG_MUTATIONS=true
+      - ytdl_use_local_db=true
+      - write_ytdl_config=true
+    volumes:
+      - $DIR_CONF/ytdl/appdata:/app/appdata
+      - $DIR_MEDIA/YOUTUBE:/app/video
+      - $DIR_CONF/ytdl/subscriptions:/app/subscriptions
+      - $DIR_CONF/ytdl/users:/app/users
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.ytdl.rule=Host(`ytdl.home.local`)"
+      - "traefik.http.routers.ytdl.entrypoints=web"
+      - "traefik.http.services.ytdl.loadbalancer.server.port=17442"
+      - "com.centurylinklabs.watchtower.enable=true"
+    # networks:
+    #   - no-internet
+    #   - internet
+
+  qbittorrent:
+    image: lscr.io/linuxserver/qbittorrent:latest
+    container_name: qbittorrent
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Etc/UTC
+      - WEBUI_PORT=8084
+    volumes:
+      - $DIR_CONF/qbit:/config
+      - $DIR_MEDIA/torrents_downloads:/downloads
+    ports:
+      - 6881:6881
+      - 6881:6881/udp
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.qbittorrent.rule=Host(`qbittorrent.home.local`)"
+      - "traefik.http.routers.qbittorrent.entrypoints=web"
+      - "traefik.http.services.qbittorrent.loadbalancer.server.port=8084"
+      - "com.centurylinklabs.watchtower.enable=true"
+    # networks:
+    #   - no-internet
+    #   - internet
+
+  jellyfin:
+    image: jellyfin/jellyfin
+    container_name: jellyfin
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+    volumes:
+      - $DIR_CONF/jellyfin/config:/config
+      - $DIR_MEDIA/films:/data/movies:ro
+      - $DIR_MEDIA/torrents_downloads:/data/torrents:ro
+    ports:
+      - 8096:8096
+      - 8920:8920 #optional
+      - 7359:7359/udp #optional
+      - 1900:1900/udp #optional
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Europe/Moscow
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.jellyfin.rule=Host(`jellyfin.home.local`)"
+      - "traefik.http.routers.jellyfin.entrypoints=web"
+      - "traefik.http.services.jellyfin.loadbalancer.server.port=8096"
+      - "com.centurylinklabs.watchtower.enable=true"
+    # networks:
+    #   - no-internet
+
+  portainer:
+    image: portainer/portainer-ce
+    container_name: portainer
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+    security_opt:
+      - no-new-privileges:true
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - $DIR_CONF/portainer/data:/data
+      - $DIR_CONF/portainer/shared:/shared
+      - /etc/localtime:/etc/localtime:ro
+    environment:
+      - TZ=Europe/Moscow
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.pihole.entrypoints=web"
+      - "traefik.http.routers.portainer.rule=Host(`portainer.home.local`)"
+      - "traefik.http.services.portainer.loadbalancer.server.port=9000"
+      - "com.centurylinklabs.watchtower.enable=true"
+    # networks:
+    #   - no-internet
+    #   - internet
+
+  watchtower:
+    image: containrrr/watchtower
+    container_name: watchtower
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /etc/timezone:/etc/timezone:ro
+    environment:
+      - WATCHTOWER_CLEANUP=true
+      - WATCHTOWER_LABEL_ENABLE=true
+      - WATCHTOWER_INCLUDE_RESTARTING=true
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+    # networks:
+    #   - no-internet
+    #   - internet
+
+  glances:
+    image: nicolargo/glances:latest-alpine
+    restart: always
+    pid: host
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      - "GLANCES_OPT=-w"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.glances.entrypoints=web"
+      - "traefik.http.routers.glances.rule=Host(`glances.home.local`)"
+      - "traefik.http.services.glances.loadbalancer.server.port=61208"
+      - "com.centurylinklabs.watchtower.enable=true"
+
+    # TODO: restrict access to the internet in better way
+    dns: 0.0.0.0
+
+    # networks:
+    #   - no-internet
+
+  go2rtc:
+    image: alexxit/go2rtc
+    container_name: go2rtc
+    privileged: true         # only for FFmpeg hardware transcoding
+    restart: unless-stopped  # autorestart on fail or config change from WebUI
+    environment:
+      - TZ=Europe/Moscow     # timezone in logs
+    ports:
+      - 1984:1984
+    volumes:
+      - $DIR_CONF/go2rtc:/config # folder for go2rtc.yaml file (edit from WebUI)
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.pihole.entrypoints=web"
+      - "traefik.http.routers.portainer.rule=Host(`go2rtc.home.local`)"
+      - "traefik.http.services.portainer.loadbalancer.server.port=1984"
+      # - "com.centurylinklabs.watchtower.enable=true"
+
+    # TODO: restrict access to the internel in better way
+    dns: 0.0.0.0
+
+    # networks:
+    #   - no-internet
+
+  home-assistant:
+    container_name: home-assistant
+    image: "ghcr.io/home-assistant/home-assistant:stable"
+    restart: always
+    volumes:
+      - $DIR_DATA/home-assistant/config:/config
+      - $DIR_DATA/home-assistant/media:/media
+    depends_on:
+      - mosquitto
+    ports:
+      - 8123:8123
+      - 1400:1400
+    environment:
+      TZ: "Europe/Moscow"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.nginx.rule=Host(`home-assist.local`)"
+      - "traefik.http.routers.nginx.entrypoints=web"
+      - "traefik.http.services.nginx.loadbalancer.server.port=8123"
+      - "com.centurylinklabs.watchtower.enable=true"
+    # networks:
+    #   - no-internet
+    #   - internet
+
+  mosquitto:
+    container_name: mosquitto
+    image: eclipse-mosquitto
+    restart: always
+    ports:
+      - 1883:1883
+      - 1884:1884
+    volumes:
+      - $DIR_CONF/mosquitto/config:/mosquitto/config
+      - $DIR_DATA/mosquitto/data:/mosquitto/data
+      - $DIR_LOGS/mosquitto/log:/mosquitto/log
+    environment:
+      TZ: "Europe/Moscow"
+    # networks:
+    #   - no-internet
+
+  chrony:
+    container_name: chrony
+    image: cturra/ntp
+    restart: always
+    environment:
+      - NTP_SERVERS=time.windows.com
+    ports:
+      - 123:123
+    # networks:
+    #   - no-internet
+    #   - internet
+
+# networks:
+#   no-internet:
+#     driver: bridge
+#     internal: true
+#   internet:
+#     driver: bridge
