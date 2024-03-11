@@ -258,6 +258,28 @@ services:
     # networks:
     #   - no-internet
 
+  vikunja:
+    container_name: vikunja
+    image: vikunja/vikunja
+    environment:
+      VIKUNJA_SERVICE_JWTSECRET: a_super_secure_random_secret
+      VIKUNJA_SERVICE_PUBLICURL: http://<your public frontend url with slash>/
+      # Note the default path is /app/vikunja/vikunja.db.
+      # This config variable moves it to a different folder so you can use a volume and 
+      # store the database file outside the container so state is persisted even if the container is destroyed.
+      VIKUNJA_DATABASE_PATH: /db/vikunja.db
+    ports:
+      - 3456:3456
+    volumes:
+      - $DIR_DATA/vikunja/files:/app/vikunja/files
+      - $DIR_DATA/vikunja/db:/db
+    restart: unless-stopped
+    # labels:
+    #   - "traefik.enable=true"
+    #   - "traefik.http.routers.pihole.entrypoints=web"
+    #   - "traefik.http.routers.portainer.rule=Host(`vikunja.home.local`)"
+    #   - "traefik.http.services.portainer.loadbalancer.server.port=3456"
+
   chrony:
     container_name: chrony
     image: cturra/ntp
