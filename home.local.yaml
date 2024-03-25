@@ -208,8 +208,8 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.pihole.entrypoints=web"
-      - "traefik.http.routers.portainer.rule=Host(`go2rtc.home.local`)"
-      - "traefik.http.services.portainer.loadbalancer.server.port=1984"
+      - "traefik.http.routers.go2rtc.rule=Host(`go2rtc.home.local`)"
+      - "traefik.http.services.go2rtc.loadbalancer.server.port=1984"
       # - "com.centurylinklabs.watchtower.enable=true"
 
     # TODO: restrict access to the internel in better way
@@ -228,6 +228,8 @@ services:
     depends_on:
       - mosquitto
     ports:
+      - 6666:6666
+      - 6667:6667
       - 8123:8123
       - 1400:1400
     environment:
