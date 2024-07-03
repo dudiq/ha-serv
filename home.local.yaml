@@ -61,6 +61,7 @@ services:
     volumes:
       - $DIR_CONF/ytdl/appdata:/app/appdata
       - $DIR_MEDIA/YOUTUBE:/app/video
+      # - $DIR_MEDIA/YOUTUBE/audio:/app/audio
       - $DIR_CONF/ytdl/subscriptions:/app/subscriptions
       - $DIR_CONF/ytdl/users:/app/users
     labels:
@@ -145,7 +146,7 @@ services:
       - TZ=Europe/Moscow
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.pihole.entrypoints=web"
+      - "traefik.http.routers.portainer.entrypoints=web"
       - "traefik.http.routers.portainer.rule=Host(`portainer.home.local`)"
       - "traefik.http.services.portainer.loadbalancer.server.port=9000"
       - "com.centurylinklabs.watchtower.enable=true"
@@ -207,7 +208,7 @@ services:
       - $DIR_CONF/go2rtc:/config # folder for go2rtc.yaml file (edit from WebUI)
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.pihole.entrypoints=web"
+      - "traefik.http.routers.go2rtc.entrypoints=web"
       - "traefik.http.routers.go2rtc.rule=Host(`go2rtc.home.local`)"
       - "traefik.http.services.go2rtc.loadbalancer.server.port=1984"
       # - "com.centurylinklabs.watchtower.enable=true"
@@ -276,11 +277,63 @@ services:
       - $DIR_DATA/vikunja/files:/app/vikunja/files
       - $DIR_DATA/vikunja/db:/db
     restart: unless-stopped
-    # labels:
-    #   - "traefik.enable=true"
-    #   - "traefik.http.routers.pihole.entrypoints=web"
-    #   - "traefik.http.routers.portainer.rule=Host(`vikunja.home.local`)"
-    #   - "traefik.http.services.portainer.loadbalancer.server.port=3456"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.vikunja.entrypoints=web"
+      - "traefik.http.routers.vikunja.rule=Host(`vikunja.home.local`)"
+      - "traefik.http.services.vikunja.loadbalancer.server.port=3456"
+
+  lidarr:
+    container_name: lidarr
+    image: lscr.io/linuxserver/lidarr:latest
+    environment:
+      - TZ=Europe/Moscow
+
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - $DIR_MEDIA/lidarr/audio:/media
+      - $DIR_DATA/lidarr:/config
+      - $DIR_MEDIA/lidarr/downloads:/downloads
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.lidarr.rule=Host(`lidarr.home.local`)"
+      - "traefik.http.routers.lidarr.entrypoints=web"
+      - "traefik.http.services.lidarr.loadbalancer.server.port=8686"
+      - "com.centurylinklabs.watchtower.enable=true"
+      
+  filebrowser:
+    container_name: filebrowser
+    image: filebrowser/filebrowser
+    environment:
+      - TZ=Europe/Moscow
+    restart: unless-stopped
+
+    volumes:
+      - $DIR_DATA/share-files/srv:/srv
+      # - type: bind
+      #   source: $DIR_DATA/share-files/filebrowser.db
+      #   target: /database.db
+      # - type: bind
+      #   source: $DIR_DATA/share-files/.filebrowser.json
+      #   target: /.filebrowser.json
+
+    # -v /path/to/root:/srv \
+    # -v /path/filebrowser.db:/database.db \
+    # -v /path/.filebrowser.json:/.filebrowser.json \
+    # -u $(id -u):$(id -g) \
+    # -p 8080:80 \
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.share.rule=Host(`share.home.local`)"
+      - "traefik.http.routers.share.entrypoints=web"
+      - "traefik.http.services.share.loadbalancer.server.port=80"
+      - "com.centurylinklabs.watchtower.enable=true"
 
   chrony:
     container_name: chrony

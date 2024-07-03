@@ -32,6 +32,10 @@ export function Dash() {
                 title="📷 go2rtc"
               />
             </Row>
+            <Card
+              href="http://share.home.local"
+              title="Share files"          
+            />
           <Row>
             <Card
               href="http://portainer.home.local"
